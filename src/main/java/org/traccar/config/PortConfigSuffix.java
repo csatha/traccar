@@ -232,6 +232,8 @@ import org.traccar.protocol.T800xProtocol;
 import org.traccar.protocol.TaipProtocol;
 import org.traccar.protocol.TechTltProtocol;
 import org.traccar.protocol.TechtoCruzProtocol;
+import org.traccar.protocol.TediAis140HttpProtocol;
+import org.traccar.protocol.TediAis140TcpProtocol;
 import org.traccar.protocol.TekProtocol;
 import org.traccar.protocol.TelemaxProtocol;
 import org.traccar.protocol.TelicProtocol;
@@ -562,6 +564,8 @@ public class PortConfigSuffix extends ConfigSuffix<Integer> {
         put(RadshidProtocol.class, 5265);
         put(R16hProtocol.class, 5266);
         put(JimiPhotoProtocol.class, 5267);
+        put(TediAis140HttpProtocol.class, 5268);
+        put(TediAis140TcpProtocol.class, 5269);
     }
 
     PortConfigSuffix(String key, List<KeyType> types) {
