@@ -1080,6 +1080,16 @@ public final class Keys {
             List.of(KeyType.CONFIG));
 
     /**
+     * URL of the external mining vehicle-tracking API that positions decoded on the "Mining" protocol
+     * variants (TediAis140MiningTcp, TediAis140MiningHttp, ItsMining) are forwarded to, in addition to
+     * their normal processing.
+     */
+    public static final ConfigKey<String> MINING_FORWARD_URL = new StringConfigKey(
+            "mining.forward.url",
+            List.of(KeyType.CONFIG),
+            "https://devmtsv1.xenovex.com/cron/vehiclegpsdata.php");
+
+    /**
      * Enable position forwarding retries. When enabled, additional attempts are made to deliver positions. If initial
      * delivery fails because of an unreachable server or an HTTP response different from '2xx', the software waits
      * for 'forward.retry.delay' milliseconds to retry delivery. On subsequent failures, this delay is duplicated.

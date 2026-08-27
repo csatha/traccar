@@ -119,6 +119,7 @@ import org.traccar.protocol.Hyn600Protocol;
 import org.traccar.protocol.IdplProtocol;
 import org.traccar.protocol.IntellitracProtocol;
 import org.traccar.protocol.IotmProtocol;
+import org.traccar.protocol.ItsMiningProtocol;
 import org.traccar.protocol.ItsProtocol;
 import org.traccar.protocol.Ivt401Protocol;
 import org.traccar.protocol.JidoProtocol;
@@ -233,6 +234,8 @@ import org.traccar.protocol.TaipProtocol;
 import org.traccar.protocol.TechTltProtocol;
 import org.traccar.protocol.TechtoCruzProtocol;
 import org.traccar.protocol.TediAis140HttpProtocol;
+import org.traccar.protocol.TediAis140MiningHttpProtocol;
+import org.traccar.protocol.TediAis140MiningTcpProtocol;
 import org.traccar.protocol.TediAis140TcpProtocol;
 import org.traccar.protocol.TekProtocol;
 import org.traccar.protocol.TelemaxProtocol;
@@ -566,6 +569,9 @@ public class PortConfigSuffix extends ConfigSuffix<Integer> {
         put(JimiPhotoProtocol.class, 5267);
         put(TediAis140HttpProtocol.class, 5268);
         put(TediAis140TcpProtocol.class, 5269);
+        put(TediAis140MiningTcpProtocol.class, 6006);
+        put(TediAis140MiningHttpProtocol.class, 6007);
+        put(ItsMiningProtocol.class, 6008);
     }
 
     PortConfigSuffix(String key, List<KeyType> types) {
