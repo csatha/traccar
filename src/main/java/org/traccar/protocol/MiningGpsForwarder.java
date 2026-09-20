@@ -32,7 +32,7 @@ import org.traccar.model.Device;
 import org.traccar.model.Position;
 import org.traccar.session.cache.CacheManager;
 
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -61,7 +61,7 @@ final class MiningGpsForwarder {
     private static final Logger LOGGER = LoggerFactory.getLogger(MiningGpsForwarder.class);
 
     private static final DateTimeFormatter TIMESTAMP_FORMAT = DateTimeFormatter
-            .ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneOffset.UTC);
+            .ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.of("Asia/Kolkata"));
 
     private static final ObjectMapper LOG_MAPPER = new ObjectMapper();
 
