@@ -52,6 +52,7 @@ public class NetworkForwarder {
     private final Bootstrap tcpBootstrap;
     private final Channel udpChannel;
     private final Map<InetSocketAddress, ChannelFuture> tcpConnects = new ConcurrentHashMap<>();
+    private final Map<ForwardKey, ChannelFuture> sharedTcpConnects = new ConcurrentHashMap<>();
 
     @Inject
     public NetworkForwarder(
@@ -114,6 +115,26 @@ public class NetworkForwarder {
         });
     }
 
+    public void forwardShared(String target, int port, byte[] data) {
+        ForwardKey key = new ForwardKey(target, port);
+        ChannelFuture connectFuture = sharedTcpConnects.get(key);
+        if (connectFuture == null) {
+            connectFuture = tcpBootstrap.connect(target, port);
+            sharedTcpConnects.put(key, connectFuture);
+            ChannelFuture registered = connectFuture;
+            connectFuture.channel().closeFuture().addListener(
+                    future -> sharedTcpConnects.remove(key, registered));
+        }
+        ChannelFuture pending = connectFuture;
+        connectFuture.addListener(future -> {
+            if (future.isSuccess()) {
+                pending.channel().writeAndFlush(Unpooled.wrappedBuffer(data)).addListener(this::logFailure);
+            } else {
+                logFailure(future);
+            }
+        });
+    }
+
     public void disconnect(InetSocketAddress source) {
         ChannelFuture connectFuture = tcpConnects.remove(source);
         if (connectFuture != null) {
@@ -125,6 +146,9 @@ public class NetworkForwarder {
         if (!future.isSuccess()) {
             LOGGER.warn("Network forwarding error", future.cause());
         }
+    }
+
+    private record ForwardKey(String target, int port) {
     }
 
 }

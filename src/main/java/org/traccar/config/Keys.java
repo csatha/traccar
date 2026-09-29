@@ -1090,6 +1090,22 @@ public final class Keys {
             "https://devmtsv1.xenovex.com/cron/vehiclegpsdata.php");
 
     /**
+     * Host for forwarding raw Evue AIS-140 HTTP request bodies over TCP.
+     */
+    public static final ConfigKey<String> EVUE_FORWARD_HOST = new StringConfigKey(
+            "evue.forward.host",
+            List.of(KeyType.CONFIG),
+            "track.fleeteyes.in");
+
+    /**
+     * Port for forwarding raw Evue AIS-140 HTTP request bodies over TCP.
+     */
+    public static final ConfigKey<Integer> EVUE_FORWARD_PORT = new IntegerConfigKey(
+            "evue.forward.port",
+            List.of(KeyType.CONFIG),
+            7007);
+
+    /**
      * Enable position forwarding retries. When enabled, additional attempts are made to deliver positions. If initial
      * delivery fails because of an unreachable server or an HTTP response different from '2xx', the software waits
      * for 'forward.retry.delay' milliseconds to retry delivery. On subsequent failures, this delay is duplicated.

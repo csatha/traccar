@@ -75,6 +75,8 @@ import org.traccar.protocol.EnnfuProtocol;
 import org.traccar.protocol.EnvotechProtocol;
 import org.traccar.protocol.EsealProtocol;
 import org.traccar.protocol.EskyProtocol;
+import org.traccar.protocol.EvueAis140HttpProtocol;
+import org.traccar.protocol.EvueAis140MiningHttpProtocol;
 import org.traccar.protocol.ExtremTracProtocol;
 import org.traccar.protocol.FifotrackProtocol;
 import org.traccar.protocol.FleetGuideProtocol;
@@ -569,9 +571,11 @@ public class PortConfigSuffix extends ConfigSuffix<Integer> {
         put(JimiPhotoProtocol.class, 5267);
         put(TediAis140HttpProtocol.class, 5268);
         put(TediAis140TcpProtocol.class, 5269);
+        put(EvueAis140HttpProtocol.class, 5270);
         put(TediAis140MiningTcpProtocol.class, 6006);
         put(TediAis140MiningHttpProtocol.class, 6007);
         put(ItsMiningProtocol.class, 6008);
+        put(EvueAis140MiningHttpProtocol.class, 6009);
     }
 
     PortConfigSuffix(String key, List<KeyType> types) {
