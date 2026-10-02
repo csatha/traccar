@@ -19,9 +19,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.Entity;
-import jakarta.ws.rs.client.InvocationCallback;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import org.glassfish.jersey.client.ClientProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.traccar.config.Config;
@@ -37,6 +37,13 @@ import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Converts positions decoded on the "Mining" variant ports (see {@link TediAis140MiningTcpProtocol},
@@ -65,6 +72,30 @@ final class MiningGpsForwarder {
 
     private static final ObjectMapper LOG_MAPPER = new ObjectMapper();
 
+    // Bound the optional downstream integration so it can never exhaust Traccar/Jersey threads.
+    private static final int MAX_CONCURRENT_REQUESTS = 32;
+    private static final int MAX_QUEUED_REQUESTS = 10_000;
+    private static final int CONNECT_TIMEOUT_MILLIS = 3_000;
+    private static final int READ_TIMEOUT_MILLIS = 7_000;
+
+    private static final AtomicInteger THREAD_NUMBER = new AtomicInteger();
+    private static final AtomicLong DROPPED_REQUESTS = new AtomicLong();
+
+    private static final ThreadFactory THREAD_FACTORY = runnable -> {
+        Thread thread = new Thread(runnable, "mining-forwarder-" + THREAD_NUMBER.incrementAndGet());
+        thread.setDaemon(true);
+        return thread;
+    };
+
+    private static final ThreadPoolExecutor EXECUTOR = new ThreadPoolExecutor(
+            MAX_CONCURRENT_REQUESTS,
+            MAX_CONCURRENT_REQUESTS,
+            0L,
+            TimeUnit.MILLISECONDS,
+            new ArrayBlockingQueue<>(MAX_QUEUED_REQUESTS),
+            THREAD_FACTORY,
+            new ThreadPoolExecutor.AbortPolicy());
+
     private MiningGpsForwarder() {
     }
 
@@ -87,7 +118,7 @@ final class MiningGpsForwarder {
             return;
         }
         String url = config.getString(Keys.MINING_FORWARD_URL);
-        if (url == null || url.isEmpty()) {
+        if (url == null || url.isBlank()) {
             return;
         }
         Device device = cacheManager.getObject(Device.class, position.getDeviceId());
@@ -95,38 +126,62 @@ final class MiningGpsForwarder {
             return;
         }
 
+        final Map<String, Object> payload;
         try {
-            Map<String, Object> payload = buildPayload(position, device, rawData);
-            LOGGER.info("Mining GPS forward payload for device {}: {}", device.getUniqueId(), toJson(payload));
-            client.target(url).request().async().post(
-                    Entity.entity(payload, MediaType.APPLICATION_JSON_TYPE), new InvocationCallback<Response>() {
-                @Override
-                public void completed(Response response) {
-                    if (response.getStatusInfo().getFamily() != Response.Status.Family.SUCCESSFUL) {
-                        String body = response.hasEntity() ? response.readEntity(String.class) : "";
-                        LOGGER.warn("Mining GPS forward failed with HTTP {} for device {}: {}",
-                                response.getStatus(), device.getUniqueId(), body);
-                    } else {
-                        LOGGER.debug("Mining GPS forward succeeded for device {}", device.getUniqueId());
-                    }
-                    response.close();
-                }
-
-                @Override
-                public void failed(Throwable throwable) {
-                    LOGGER.warn("Mining GPS forward failed for device " + device.getUniqueId(), throwable);
-                }
-            });
+            payload = buildPayload(position, device, rawData);
         } catch (RuntimeException error) {
-            // A mapping/formatting bug here must never take down the connection that is
-            // decoding the device's own message - log and move on.
             LOGGER.warn("Mining GPS forward failed to build payload for device " + device.getUniqueId(), error);
+            return;
         }
+
+        String deviceUniqueId = device.getUniqueId();
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Mining GPS forward payload for device {}: {}", deviceUniqueId, toJson(payload));
+        }
+
+        try {
+            EXECUTOR.execute(() -> send(client, url, deviceUniqueId, payload));
+        } catch (RejectedExecutionException error) {
+            long dropped = DROPPED_REQUESTS.incrementAndGet();
+            if (dropped == 1 || dropped % 1000 == 0) {
+                LOGGER.warn(
+                        "Mining GPS forwarding queue full; dropped {} request(s). activeWorkers={}, queuedRequests={}",
+                        dropped, EXECUTOR.getActiveCount(), EXECUTOR.getQueue().size());
+            }
+        }
+    }
+
+    private static void send(
+            Client client, String url, String deviceUniqueId, Map<String, Object> payload) {
+        try (Response response = client.target(url)
+                .property(ClientProperties.CONNECT_TIMEOUT, CONNECT_TIMEOUT_MILLIS)
+                .property(ClientProperties.READ_TIMEOUT, READ_TIMEOUT_MILLIS)
+                .request(MediaType.APPLICATION_JSON_TYPE)
+                .post(Entity.entity(payload, MediaType.APPLICATION_JSON_TYPE))) {
+
+            if (response.getStatusInfo().getFamily() != Response.Status.Family.SUCCESSFUL) {
+                String body = response.hasEntity() ? response.readEntity(String.class) : "";
+                LOGGER.warn("Mining GPS forward failed with HTTP {} for device {}: {}",
+                        response.getStatus(), deviceUniqueId, limit(body, 1000));
+            } else {
+                LOGGER.debug("Mining GPS forward succeeded for device {}", deviceUniqueId);
+            }
+        } catch (RuntimeException error) {
+            LOGGER.warn("Mining GPS forward transport failure for device {}: {}",
+                    deviceUniqueId, error.getMessage());
+        }
+    }
+
+    private static String limit(String value, int maxLength) {
+        if (value == null) {
+            return "";
+        }
+        return value.length() <= maxLength ? value : value.substring(0, maxLength) + "...";
     }
 
     private static String toJson(Map<String, Object> payload) {
         try {
-            return LOG_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(payload);
+            return LOG_MAPPER.writeValueAsString(payload);
         } catch (JsonProcessingException error) {
             return payload.toString();
         }
